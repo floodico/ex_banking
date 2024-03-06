@@ -28,16 +28,23 @@ defmodule ExBanking do
              | :user_does_not_exist
              | :not_enough_money
              | :too_many_requests_to_user}
-  def withdraw(user, amount, currency) do
-    {:ok, 100.0}
+  def withdraw(user, amount, currency)
+      when is_binary(user) and user != "" and is_number(amount) and amount >= 0 and
+             is_binary(currency) and currency != "" do
+    ExBanking.AccountsManager.withdraw(user, amount, currency)
   end
+
+  def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
   @spec get_balance(user :: String.t(), currency :: String.t()) ::
           {:ok, balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
-  def get_balance(user, currency) do
-    {:ok, 100.0}
+  def get_balance(user, currency)
+      when is_binary(user) and user != "" and is_binary(currency) and currency != "" do
+    ExBanking.AccountsManager.get_balance(user, currency)
   end
+
+  def get_balance(_user, _currency), do: {:error, :wrong_arguments}
 
   @spec send(
           from_user :: String.t(),
