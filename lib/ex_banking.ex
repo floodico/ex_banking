@@ -3,9 +3,12 @@ defmodule ExBanking do
   Documentation for `ExBanking`.
   """
 
+  alias ExBanking.Accounts
+  alias ExBanking.MoneyBalance
+
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
   def create_user(user) when is_binary(user) and user != "" do
-    ExBanking.AccountsManager.create_user(user)
+    Accounts.create(user)
   end
 
   def create_user(_user), do: {:error, :wrong_arguments}
@@ -16,7 +19,11 @@ defmodule ExBanking do
   def deposit(user, amount, currency)
       when is_binary(user) and user != "" and is_number(amount) and amount >= 0 and
              is_binary(currency) and currency != "" do
-    ExBanking.AccountsManager.deposit(user, amount, currency)
+    if Accounts.exists?(user) do
+      MoneyBalance.deposit(user, amount, currency)
+    else
+      {:error, :user_does_not_exist}
+    end
   end
 
   def deposit(_user, _amount, _currency), do: {:error, :wrong_arguments}
@@ -31,7 +38,11 @@ defmodule ExBanking do
   def withdraw(user, amount, currency)
       when is_binary(user) and user != "" and is_number(amount) and amount >= 0 and
              is_binary(currency) and currency != "" do
-    ExBanking.AccountsManager.withdraw(user, amount, currency)
+    if Accounts.exists?(user) do
+      MoneyBalance.withdraw(user, amount, currency)
+    else
+      {:error, :user_does_not_exist}
+    end
   end
 
   def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
@@ -41,7 +52,11 @@ defmodule ExBanking do
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def get_balance(user, currency)
       when is_binary(user) and user != "" and is_binary(currency) and currency != "" do
-    ExBanking.AccountsManager.get_balance(user, currency)
+    if Accounts.exists?(user) do
+      MoneyBalance.get_balance(user, currency)
+    else
+      {:error, :user_does_not_exist}
+    end
   end
 
   def get_balance(_user, _currency), do: {:error, :wrong_arguments}

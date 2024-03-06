@@ -2,6 +2,9 @@ defmodule ExBankingTest do
   use ExUnit.Case
   doctest ExBanking
 
+  alias ExBanking.AccountsRegistry
+  alias ExBanking.AccountsSupervisor
+
   describe "create_user/1" do
     test "creates user successfully" do
       assert :ok = ExBanking.create_user("Jack")
@@ -22,7 +25,7 @@ defmodule ExBankingTest do
   describe "deposit/3" do
     setup do
       :ok = ExBanking.create_user(@deposit_user)
-      on_exit(fn -> :sys.replace_state(ExBanking.AccountsManager, fn _ -> %{} end) end)
+      on_exit(fn -> remove_user(@deposit_user) end)
     end
 
     test "makes successful deposits in different currencies" do
@@ -65,7 +68,7 @@ defmodule ExBankingTest do
       :ok = ExBanking.create_user(@deposit_user)
       {:ok, 500.0} = ExBanking.deposit(@deposit_user, 500, "EUR")
       {:ok, 500.0} = ExBanking.deposit(@deposit_user, 500, "USD")
-      on_exit(fn -> :sys.replace_state(ExBanking.AccountsManager, fn _ -> %{} end) end)
+      on_exit(fn -> remove_user(@deposit_user) end)
     end
 
     test "makes successful withdrawals in different currencies" do
@@ -115,7 +118,7 @@ defmodule ExBankingTest do
   describe "get_balance/2" do
     setup do
       :ok = ExBanking.create_user(@deposit_user)
-      on_exit(fn -> :sys.replace_state(ExBanking.AccountsManager, fn _ -> %{} end) end)
+      on_exit(fn -> remove_user(@deposit_user) end)
     end
 
     test "returns the initial currency balance" do
@@ -157,5 +160,10 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, "")
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, nil)
     end
+  end
+
+  defp remove_user(user) do
+    [{pid, _}] = Registry.lookup(AccountsRegistry, user)
+    :ok = DynamicSupervisor.terminate_child(AccountsSupervisor, pid)
   end
 end
