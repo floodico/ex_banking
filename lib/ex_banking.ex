@@ -17,7 +17,7 @@ defmodule ExBanking do
           {:ok, new_balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def deposit(user, amount, currency)
-      when is_binary(user) and user != "" and is_number(amount) and amount >= 0 and
+      when is_binary(user) and user != "" and is_number(amount) and amount > 0 and
              is_binary(currency) and currency != "" do
     if Accounts.exists?(user) do
       MoneyBalance.deposit(user, amount, currency)
@@ -36,7 +36,7 @@ defmodule ExBanking do
              | :not_enough_money
              | :too_many_requests_to_user}
   def withdraw(user, amount, currency)
-      when is_binary(user) and user != "" and is_number(amount) and amount >= 0 and
+      when is_binary(user) and user != "" and is_number(amount) and amount > 0 and
              is_binary(currency) and currency != "" do
     if Accounts.exists?(user) do
       MoneyBalance.withdraw(user, amount, currency)
@@ -75,7 +75,21 @@ defmodule ExBanking do
              | :receiver_does_not_exist
              | :too_many_requests_to_sender
              | :too_many_requests_to_receiver}
-  def send(from_user, to_user, amount, currency) do
-    {:ok, 100.0, 100.0}
+  def send(from_user, to_user, amount, currency)
+      when is_binary(from_user) and from_user != "" and is_binary(to_user) and to_user != "" and
+             from_user != to_user and is_number(amount) and amount > 0 and is_binary(currency) and
+             currency != "" do
+    with {_, true} <- {:sender_exists?, Accounts.exists?(from_user)},
+         {_, true} <- {:receiver_exists?, Accounts.exists?(to_user)},
+         {:ok, from_user_balance} <- MoneyBalance.withdraw(from_user, amount, currency),
+         {:ok, to_user_balance} <- MoneyBalance.deposit(to_user, amount, currency) do
+      {:ok, from_user_balance, to_user_balance}
+    else
+      {:sender_exists?, false} -> {:error, :sender_does_not_exist}
+      {:receiver_exists?, false} -> {:error, :receiver_does_not_exist}
+      error -> error
+    end
   end
+
+  def send(_from_user, _to_user, _amount, _currency), do: {:error, :wrong_arguments}
 end

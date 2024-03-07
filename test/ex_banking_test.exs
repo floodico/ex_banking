@@ -50,6 +50,10 @@ defmodule ExBankingTest do
       assert {:error, :user_does_not_exist} = ExBanking.deposit("Absent", 300, "EUR")
     end
 
+    test "returns error when depositing zero amount" do
+      assert {:error, :wrong_arguments} = ExBanking.deposit(@deposit_user, 0, "EUR")
+    end
+
     test "returns error when arguments are not valid" do
       assert {:error, :wrong_arguments} = ExBanking.deposit("", 300, "EUR")
       assert {:error, :wrong_arguments} = ExBanking.deposit(nil, 300, "EUR")
@@ -100,6 +104,10 @@ defmodule ExBankingTest do
 
       assert {:error, :not_enough_money} = ExBanking.withdraw(@deposit_user, 100, "UAH")
       assert {:error, :not_enough_money} = ExBanking.withdraw(@deposit_user, 100, "USDT")
+    end
+
+    test "returns error when withdrawing zero amount" do
+      assert {:error, :wrong_arguments} = ExBanking.withdraw(@deposit_user, 0, "EUR")
     end
 
     test "returns error when arguments are not valid" do
@@ -159,6 +167,51 @@ defmodule ExBankingTest do
 
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, "")
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, nil)
+    end
+  end
+
+  @sender "Lukas"
+  @receiver "Peter"
+  describe "send/4" do
+    setup do
+      :ok = ExBanking.create_user(@sender)
+      :ok = ExBanking.create_user(@receiver)
+
+      on_exit(fn ->
+        remove_user(@sender)
+        remove_user(@receiver)
+      end)
+    end
+
+    test "makes a transfer successfully" do
+      {:ok, 500.0} = ExBanking.deposit(@sender, 500, "EUR")
+      assert {:ok, 0.0, 500.0} = ExBanking.send(@sender, @receiver, 500, "EUR")
+    end
+
+    test "returns error when some of users does not exist" do
+      assert {:error, :sender_does_not_exist} = ExBanking.send("Absent", @receiver, 500, "EUR")
+      assert {:error, :sender_does_not_exist} = ExBanking.send("Absent1", "Absent2", 500, "EUR")
+      assert {:error, :receiver_does_not_exist} = ExBanking.send(@sender, "Absent2", 500, "EUR")
+    end
+
+    test "returns error when sender doesn't have enough currency amount" do
+      assert {:error, :not_enough_money} = ExBanking.send(@sender, @receiver, 900, "EUR")
+    end
+
+    test "returns error when transferring zero amount" do
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 0, "EUR")
+    end
+
+    test "returns error when arguments are not valid" do
+      assert {:error, :wrong_arguments} = ExBanking.send("", nil, 300, "EUR")
+      assert {:error, :wrong_arguments} = ExBanking.send(nil, "", 300, "EUR")
+
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, -300, "EUR")
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, "300", "EUR")
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, nil, "EUR")
+
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 300, "")
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 300, nil)
     end
   end
 
