@@ -19,10 +19,11 @@ defmodule ExBanking do
   def deposit(user, amount, currency)
       when is_binary(user) and user != "" and is_number(amount) and amount > 0 and
              is_binary(currency) and currency != "" do
-    if Accounts.exists?(user) do
+    with {:ok, pid} <- Accounts.lookup(user),
+         :ok <- Accounts.allow_transaction_for_user(pid) do
       MoneyBalance.deposit(user, amount, currency)
     else
-      {:error, :user_does_not_exist}
+      error -> error
     end
   end
 
@@ -38,10 +39,11 @@ defmodule ExBanking do
   def withdraw(user, amount, currency)
       when is_binary(user) and user != "" and is_number(amount) and amount > 0 and
              is_binary(currency) and currency != "" do
-    if Accounts.exists?(user) do
+    with {:ok, pid} <- Accounts.lookup(user),
+         :ok <- Accounts.allow_transaction_for_user(pid) do
       MoneyBalance.withdraw(user, amount, currency)
     else
-      {:error, :user_does_not_exist}
+      error -> error
     end
   end
 
@@ -52,10 +54,11 @@ defmodule ExBanking do
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def get_balance(user, currency)
       when is_binary(user) and user != "" and is_binary(currency) and currency != "" do
-    if Accounts.exists?(user) do
+    with {:ok, pid} <- Accounts.lookup(user),
+         :ok <- Accounts.allow_transaction_for_user(pid) do
       MoneyBalance.get_balance(user, currency)
     else
-      {:error, :user_does_not_exist}
+      error -> error
     end
   end
 
@@ -79,14 +82,18 @@ defmodule ExBanking do
       when is_binary(from_user) and from_user != "" and is_binary(to_user) and to_user != "" and
              from_user != to_user and is_number(amount) and amount > 0 and is_binary(currency) and
              currency != "" do
-    with {_, true} <- {:sender_exists?, Accounts.exists?(from_user)},
-         {_, true} <- {:receiver_exists?, Accounts.exists?(to_user)},
+    with {_, {:ok, sender_pid}} <- {:sender_lookup, Accounts.lookup(from_user)},
+         {_, {:ok, receiver_pid}} <- {:receiver_lookup, Accounts.lookup(to_user)},
+         {_, :ok} <- {:sender_req_check, Accounts.allow_transaction_for_user(sender_pid)},
+         {_, :ok} <- {:receiver_req_check, Accounts.allow_transaction_for_user(receiver_pid)},
          {:ok, from_user_balance} <- MoneyBalance.withdraw(from_user, amount, currency),
          {:ok, to_user_balance} <- MoneyBalance.deposit(to_user, amount, currency) do
       {:ok, from_user_balance, to_user_balance}
     else
-      {:sender_exists?, false} -> {:error, :sender_does_not_exist}
-      {:receiver_exists?, false} -> {:error, :receiver_does_not_exist}
+      {:sender_lookup, _} -> {:error, :sender_does_not_exist}
+      {:receiver_lookup, _} -> {:error, :receiver_does_not_exist}
+      {:sender_req_check, _} -> {:error, :too_many_requests_to_sender}
+      {:receiver_req_check, _} -> {:error, :too_many_requests_to_receiver}
       error -> error
     end
   end

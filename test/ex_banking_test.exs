@@ -2,6 +2,7 @@ defmodule ExBankingTest do
   use ExUnit.Case
   doctest ExBanking
 
+  alias ExBanking.Accounts
   alias ExBanking.AccountsRegistry
   alias ExBanking.AccountsSupervisor
 
@@ -65,6 +66,12 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.deposit(@deposit_user, 300, "")
       assert {:error, :wrong_arguments} = ExBanking.deposit(@deposit_user, 300, nil)
     end
+
+    test "returns error when too many transactions for user in the process" do
+      :ok = simulate_user_transactions_limit(@deposit_user)
+
+      assert {:error, :too_many_requests_to_user} = ExBanking.deposit(@deposit_user, 300, "EUR")
+    end
   end
 
   describe "withdraw/3" do
@@ -121,6 +128,12 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.withdraw(@deposit_user, 300, "")
       assert {:error, :wrong_arguments} = ExBanking.withdraw(@deposit_user, 300, nil)
     end
+
+    test "returns error when too many transactions for user in the process" do
+      :ok = simulate_user_transactions_limit(@deposit_user)
+
+      assert {:error, :too_many_requests_to_user} = ExBanking.withdraw(@deposit_user, 300, "EUR")
+    end
   end
 
   describe "get_balance/2" do
@@ -168,6 +181,12 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, "")
       assert {:error, :wrong_arguments} = ExBanking.get_balance(@deposit_user, nil)
     end
+
+    test "returns error when too many transactions for user in the process" do
+      :ok = simulate_user_transactions_limit(@deposit_user)
+
+      assert {:error, :too_many_requests_to_user} = ExBanking.get_balance(@deposit_user, "EUR")
+    end
   end
 
   @sender "Lukas"
@@ -202,6 +221,10 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 0, "EUR")
     end
 
+    test "returns an error when trying to transfer to itself" do
+      assert {:error, :wrong_arguments} = ExBanking.send(@sender, @sender, 300, "EUR")
+    end
+
     test "returns error when arguments are not valid" do
       assert {:error, :wrong_arguments} = ExBanking.send("", nil, 300, "EUR")
       assert {:error, :wrong_arguments} = ExBanking.send(nil, "", 300, "EUR")
@@ -213,10 +236,30 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 300, "")
       assert {:error, :wrong_arguments} = ExBanking.send(@sender, @receiver, 300, nil)
     end
+
+    test "returns error when too many transactions for sender in the process" do
+      :ok = simulate_user_transactions_limit(@sender)
+
+      assert {:error, :too_many_requests_to_sender} =
+               ExBanking.send(@sender, @receiver, 300, "EUR")
+    end
+
+    test "returns error when too many transactions for receiver in the process" do
+      :ok = simulate_user_transactions_limit(@receiver)
+
+      assert {:error, :too_many_requests_to_receiver} =
+               ExBanking.send(@sender, @receiver, 300, "EUR")
+    end
   end
 
   defp remove_user(user) do
     [{pid, _}] = Registry.lookup(AccountsRegistry, user)
     :ok = DynamicSupervisor.terminate_child(AccountsSupervisor, pid)
+  end
+
+  defp simulate_user_transactions_limit(user) do
+    {:ok, pid} = Accounts.lookup(user)
+    true = :erlang.suspend_process(pid)
+    Enum.each(1..10, fn _ -> send(pid, :hello) end)
   end
 end
