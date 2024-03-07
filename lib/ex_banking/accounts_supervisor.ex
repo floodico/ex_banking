@@ -1,4 +1,6 @@
 defmodule ExBanking.AccountsSupervisor do
+  @moduledoc "Accounts supervisor"
+
   use DynamicSupervisor
 
   alias ExBanking.MoneyBalance
